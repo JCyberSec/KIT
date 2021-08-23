@@ -257,9 +257,8 @@ def submit(ziplocation):
 				print("ERROR\t- Failed request to submit")
 				print (response.text)
 				exit()
+			# OK
 			if response.status_code == 200:
-				# OK
-				print ("1")
 				result = response.json()
 				target_url = (result['url'])
 				headers = {'Content-Type': 'application/binary'}
