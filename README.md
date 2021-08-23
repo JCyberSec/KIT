@@ -88,7 +88,7 @@ optional arguments:
 ## Sample Usage
 ### Search
 ```python
-$ python3 KITWrapper.py search -s 'content:google, filetype: php' -d 3d -f kit.UUID, filename
-$ python3 KITWrapper.py collect -u e18a2121-3c81-4fbd-9b61-38770f833052
+$ python3 KIT.py search -s 'content:google, filetype: php' -d 3d -f 'kit.UUID, filename' -n 3
+$ python3 KIT.py content -u 2e517c8f-9375-4f55-a503-ca5bbd4d4a5b
 ```
 
