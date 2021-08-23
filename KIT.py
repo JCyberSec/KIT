@@ -259,6 +259,7 @@ def submit(ziplocation):
 				exit()
 			if response.status_code == 200:
 				# OK
+				print ("1")
 				result = response.json()
 				target_url = (result['url'])
 				headers = {'Content-Type': 'application/binary'}
@@ -279,6 +280,8 @@ def submit(ziplocation):
 					# Error
 					print ("ERROR\t- Failed PUT request")
 					print (e)
+			else:
+				print ("ERROR\t- Failed POST\tStatus code: " + str(response.status_code))
 
 # Main Function
 def main():
