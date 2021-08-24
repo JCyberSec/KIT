@@ -12,7 +12,7 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.6
+Version :: V2.6.9
 
 Change log:
 	- Building for package distribution
@@ -31,8 +31,14 @@ import errno
 ## Global Config options
 # Content download location
 Default_Download_Location = os.getcwd()
+
 # KIT API environment variable
-Env_KIT_APIKey = os.environ['KITAPI']
+try:
+	Env_KIT_APIKey = os.environ['KITAPI']
+except Exception as e:
+	# Error
+	print ("KITAPI key error - Ensure a API key has been added to the environment variables")
+	exit()
 
 # KIT URL base endpoint
 URL_Endpoint = 'https://api.phishfeed.com/KIT/v1'
