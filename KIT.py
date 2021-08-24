@@ -12,7 +12,7 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.5
+Version :: V2.5.1
 
 Change log:
 	- Added comments
@@ -175,17 +175,8 @@ def search(search, filter, number, date):
 # Function to prevent duplicate kit submission
 # Note: There is a duplication checker on the back end, this is to save wasting submission quotas
 # It is strongly recommended you keep this check before submitting kits as duplicates will not be processed
-def duplicateChecker(target_zip):
+def duplicateChecker(target_zip, zipsha256):
 	try:
-		with open(target_zip, 'rb') as f:
-			# Generate SHA256 for file
-			h  = hashlib.sha256()
-			b  = bytearray(128*1024)
-			mv = memoryview(b)
-			for n in iter(lambda : f.readinto(mv), 0):
-				h.update(mv[:n])
-				zipsha256 = h.hexdigest()
-
 		headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
 		data = {}
 		data['kit.sha256'] = zipsha256
@@ -210,16 +201,16 @@ def duplicateChecker(target_zip):
 		print (e)
 
 # Function to validate zip file before submission
-def validateZip(target_zip):
+def validateZip(target_zip, zipsha256):
 	if target_zip.lower().endswith('.zip'):
 		try:
 			with open(target_zip, 'rb') as f:
 				header_byte = f.read()[0:4].hex().lower()
 				# Check header bytes comply with PKZIP archive file
 				if header_byte == '504b0304':
-					if duplicateChecker(target_zip):
+					if duplicateChecker(target_zip, zipsha256):
 						# File present in KIT already
-						print ("OK\t- File already present in KIT already\t- Filename: " + str(os.path.basename(target_zip)))
+						print ("OK\t- File present in KIT\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
 						f.close()
 						return False
 				else:
@@ -242,45 +233,67 @@ def validateZip(target_zip):
 
 # Function to submit a kit to KIT Intel for processing
 def submit(ziplocation):
-	# Allow for multiple kit uploads
-	for target_zip in ziplocation:
-		if validateZip(target_zip):
-			# Submit New Kit
-			headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
-			data = {}
-			data['file_name'] = os.path.basename(target_zip)
-			try:
-				# POST request to the endpoint
-				response = requests.post(URL_Endpoint + "/submit", headers=headers, data=json.dumps(data))
-			except Exception as e:
-				# Error
-				print("ERROR\t- Failed request to submit")
-				print (response.text)
-				exit()
-			# OK
-			if response.status_code == 200:
-				result = response.json()
-				target_url = (result['url'])
-				headers = {'Content-Type': 'application/binary'}
-				# Save file binary data ready for upload
-				f = open(target_zip, 'rb')
-				data = f.read()
-				f.close()
+	try:
+		# Allow for multiple kit uploads
+		for target_zip in ziplocation:
+			with open(target_zip, 'rb') as f:
+				# Generate SHA256 for file
+				h  = hashlib.sha256()
+				b  = bytearray(128*1024)
+				mv = memoryview(b)
+				for n in iter(lambda : f.readinto(mv), 0):
+					h.update(mv[:n])
+					zipsha256 = h.hexdigest()
+			if validateZip(target_zip, zipsha256):
+				# Submit New Kit
+				headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
+				data = {}
+				data['file_name'] = os.path.basename(target_zip)
 				try:
-					# PUT request to the endpoint
-					upload = requests.put(target_url, data=data, headers=headers)
-					if upload.status_code == 200:
-						# OK
-						print ("SUCCESS\t- File submitted\t\tFilename: " + str(os.path.basename(target_zip)))
-					else:
-						# Error
-						print ("ERROR\t- Upload failed\tStatus code: " + str(upload.status_code))
+					# POST request to the endpoint
+					response = requests.post(URL_Endpoint + "/submit", headers=headers, data=json.dumps(data))
 				except Exception as e:
 					# Error
-					print ("ERROR\t- Failed PUT request")
-					print (e)
-			else:
-				print ("ERROR\t- Failed POST\tStatus code: " + str(response.status_code))
+					print("ERROR\t- Failed request to submit")
+					print (response.text)
+					exit()
+				# OK
+				if response.status_code == 200:
+					result = response.json()
+					target_url = (result['url'])
+					headers = {'Content-Type': 'application/binary'}
+					# Save file binary data ready for upload
+					f = open(target_zip, 'rb')
+					data = f.read()
+					f.close()
+					try:
+						# PUT request to the endpoint
+						upload = requests.put(target_url, data=data, headers=headers)
+						if upload.status_code == 200:
+							# OK
+							print ("SUCCESS\t- File submitted\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
+						else:
+							# Error
+							print ("ERROR\t- Upload failed\t\t- Status code: " + str(upload.status_code))
+					except Exception as e:
+						# Error
+						print ("ERROR\t- Failed PUT request")
+						print (e)
+				else:
+					print ("ERROR\t- Failed POST\t- Status code: " + str(response.status_code))
+	except OSError as e:
+		# Handle if a directory is inputted
+		if e.errno == 21:
+			ziplocation = []
+			for file in os.listdir(target_zip):
+				if file.lower().endswith('.zip'):
+					ziplocation.append(file)
+			# Scan zip files in directory
+			submit(ziplocation)
+	except Exception as e:
+		print (e)
+
+
 
 # Main Function
 def main():
