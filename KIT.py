@@ -12,12 +12,11 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.5.1
+Version :: V2.6
 
 Change log:
-	- Added comments
-	- Better error handling
-	- Updated submission API to prod
+	- Building for package distribution
+	- Removed global args variables
 
 ''' 
 
@@ -38,37 +37,11 @@ Env_KIT_APIKey = os.environ['KITAPI']
 # KIT URL base endpoint
 URL_Endpoint = 'https://api.phishfeed.com/KIT/v1'
 
-## Argparse Arguments
-parser = argparse.ArgumentParser(description="Wrapper for KIT Intel's API")
-subparsers = parser.add_subparsers(help='commands', dest='command')
-
-# Search Parser
-# -s search, -f filter, -n number, -d date
-parser_search = subparsers.add_parser('search', help='Search KIT Intel')
-parser_search.add_argument('-s', '--search', help='Search term', required='True')
-parser_search.add_argument('-f', '--filter', help='Filter return keys. Split multiple keys with a comma')
-parser_search.add_argument('-n', '--number', help='Number of items to return - Default 100', default=100)
-parser_search.add_argument('-d', '--date', help='Date range to search - 24h, 30d etc. - Default 1y', default="1y")
-
-# Content Parser
-# -u uuid, -d download, -j json
-parser_retrieve = subparsers.add_parser('content', help='Download file content')
-parser_retrieve.add_argument('-u', '--uuid', help='UUID(s) to retrieve scans for', nargs='+', required='True')
-parser_retrieve.add_argument('-d', '--download', help='Download content to file', action="store_true")
-parser_retrieve.add_argument('-j', '--json', help='Print JSON data', action="store_true")
-
-# Submit Parser
-# -f file
-parser_retrieve = subparsers.add_parser('submit', help='Submit a phishing kit for analysis. Submit a single file, multiple files, or a directory')
-parser_retrieve.add_argument('-f', '--file', help='Zip file(s) to submit', nargs='+', required='True')
-
-
-args = parser.parse_args()
 
 # Function to access content API
-def download_content(uuid):
+def download_content(uuidInput, downloadInput, jsonInput):
 	# Allow for multiple UUIDs
-	for target_uuid in uuid:
+	for target_uuid in uuidInput:
 		try:
 			target_uuid = target_uuid.strip(',')
 			headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
@@ -79,7 +52,7 @@ def download_content(uuid):
 			if response.status_code == 200:
 				result = response.json()
 				# If json argument print the returned JSON object to screen
-				if args.json:
+				if jsonInput:
 					print (result)
 				else:
 					# extract the content download URL
@@ -87,7 +60,7 @@ def download_content(uuid):
 					response = requests.get("{}".format(target_url))
 					if response.status_code == 200:
 						# If saving to file
-						if args.download:
+						if downloadInput:
 							try:
 								# Create the file, then write to the same file. This ensures files are not overwritten
 								f = open(str(Default_Download_Location) + '/' + str(target_uuid) + '.txt', 'x')
@@ -117,33 +90,34 @@ def download_content(uuid):
 		except Exception as e:
 			# Error
 			print("ERROR\t- Failed to parse {}".format(target_uuid))
+			print (e)
 
 # Function to search KIT
-def search(search, filter, number, date):
+def search(searchInput, filterInput, numberInput, dateInput):
 	headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
 	data = {}
 	
 	# Parse filter argument
-	if args.filter:
+	if filterInput:
 		filterItems = []
-		for i in filter.split(','):
+		for i in filterInput.split(','):
 			filterItems.append(i.strip())
 
 		data["filter"] = filterItems
 		filterData = (filterItems)
 	
 	# Parse number argument
-	if args.number:
-		data["page_size"] = int(args.number)
+	if numberInput:
+		data["page_size"] = int(numberInput)
 
 	# Parse date argument
-	if args.date:
+	if dateInput:
 		date = {}
-		date["gte"] = "now-" + str(args.date)
+		date["gte"] = "now-" + str(dateInput)
 		data["datetime_filter"] = date
 
 	# Split search parameters
-	search_array = args.search.replace(':', ',')
+	search_array = searchInput.replace(':', ',')
 	search_array = search_array.split(',')
 
 	try:
@@ -297,15 +271,44 @@ def submit(ziplocation):
 
 # Main Function
 def main():
+	## Argparse Arguments
+	parser = argparse.ArgumentParser(prog ='KIT', description="The phishing Kit Intelligence Tracker (KIT) APIs are a set of static analysis tools for investigating and comparing phishing kit content within single or multiple kits.\n It can search file hashes, search file content, retrieve content, and submit kits to KIT for cross-analysis.")
+	subparsers = parser.add_subparsers(help='Commands Available', dest='command')
+
+	# Search Parser
+	# -s search, -f filter, -n number, -d date
+	parser_search = subparsers.add_parser('search', help='Search KIT Intel - Search on kit names, hashes, code content, directory names')
+	parser_search.add_argument('-s', '--search', help='Search term', required='True')
+	parser_search.add_argument('-f', '--filter', help='Filter return keys. Split multiple keys with a comma')
+	parser_search.add_argument('-n', '--number', help='Number of items to return - Default 100', default=100)
+	parser_search.add_argument('-d', '--date', help='Date range to search - 24h, 30d etc. - Default 1y', default="1y")
+
+	# Content Parser
+	# -u uuid, -d download, -j json
+	parser_retrieve = subparsers.add_parser('content', help='Download file content - Default behavior is to print to screen, file can also be downloaded into the current working directory')
+	parser_retrieve.add_argument('-u', '--uuid', help='UUID(s) to retrieve scans for', nargs='+', required='True')
+	parser_retrieve.add_argument('-d', '--download', help='Download content to file', action="store_true")
+	parser_retrieve.add_argument('-j', '--json', help='Print JSON data', action="store_true")
+
+	# Submit Parser
+	# -f file
+	parser_retrieve = subparsers.add_parser('submit', help='Submit a phishing kit for analysis - Submit a single file, multiple files, or a directory')
+	parser_retrieve.add_argument('-f', '--file', help='Zip file(s) to submit', nargs='+', required='True')
+
+	args = parser.parse_args()
+
 	# Search
 	if args.command == 'search':
 		search(args.search, args.filter, args.number, args.date)
 	# Content
-	if args.command == 'content':
-		download_content(args.uuid)
+	elif args.command == 'content':
+		download_content(args.uuid, args.download, args.json)
 	# Submit
-	if args.command == 'submit':
+	elif args.command == 'submit':
 		submit(args.file)
+	else:
+		# Error
+		parser.print_help()
 
 if __name__ == '__main__':
 	main()
