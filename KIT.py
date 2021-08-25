@@ -12,7 +12,7 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.6.9
+Version :: V2.6.10
 
 Change log:
 	- Building for package distribution
@@ -37,7 +37,7 @@ try:
 	Env_KIT_APIKey = os.environ['KITAPI']
 except Exception as e:
 	# Error
-	print ("KITAPI key error - Ensure a API key has been added to the environment variables")
+	print ("ERROR\t- KITAPI key error - Ensure an API key has been added to the environment variables")
 	exit()
 
 # KIT URL base endpoint
@@ -261,6 +261,9 @@ def submit(ziplocation):
 						print (e)
 				else:
 					print ("ERROR\t- Failed POST\t- Status code: " + str(response.status_code))
+
+				# Slow down multi-kit ingest to avoid duplicate kit overlaps
+				time.sleep(2)
 	except OSError as e:
 		# Handle if a directory is inputted
 		if e.errno == 21:
@@ -278,7 +281,7 @@ def submit(ziplocation):
 # Main Function
 def main():
 	## Argparse Arguments
-	parser = argparse.ArgumentParser(prog ='KIT', description="The phishing Kit Intelligence Tracker (KIT) APIs are a set of static analysis tools for investigating and comparing phishing kit content within single or multiple kits.\n It can search file hashes, search file content, retrieve content, and submit kits to KIT for cross-analysis.")
+	parser = argparse.ArgumentParser(prog ='kitintel', description="The phishing Kit Intelligence Tracker (KIT) APIs are a set of static analysis tools for investigating and comparing phishing kit content within single or multiple kits.\n It can search file hashes, search file content, retrieve content, and submit kits to KIT for cross-analysis.")
 	subparsers = parser.add_subparsers(help='Commands Available', dest='command')
 
 	# Search Parser
