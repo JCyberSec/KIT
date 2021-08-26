@@ -12,7 +12,7 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.6.12.1
+Version :: V2.6.12.2
 
 Change log:
 	- Added recursive submission feature
@@ -28,6 +28,7 @@ import hashlib
 import errno
 import re
 import glob
+import time
 
 
 ## Global Config options
@@ -307,6 +308,7 @@ def submit(ziplocation, recursive):
 
 							# Slow down multi-kit ingest to avoid duplicate kit overlaps
 							time.sleep(2)
+
 	except OSError as e:
 		# Handle if a directory is inputted
 		if e.errno == 21:
