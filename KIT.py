@@ -12,10 +12,10 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.6.11
+Version :: V2.6.12
 
 Change log:
-	- Rebuilt the search input to validate searches and be more robust to code searches
+	- Added recursive submission feature
 
 ''' 
 
@@ -27,6 +27,8 @@ import os
 import hashlib
 import errno
 import re
+import glob
+
 
 ## Global Config options
 # Content download location
@@ -233,68 +235,79 @@ def validateZip(target_zip, zipsha256):
 		print ("ERROR\t- File not a '.zip' file\t- Filename: " + str(os.path.basename(target_zip)))
 
 # Function to submit a kit to KIT Intel for processing
-def submit(ziplocation):
+def submit(ziplocation, recursive):
 	try:
 		# Allow for multiple kit uploads
 		for target_zip in ziplocation:
+			isDirectory = os.path.isdir(target_zip)
+			if isDirectory:
+				ziplocation = []
+				if recursive:
+					ziplocation = glob.glob(target_zip + '/**/*.zip', recursive=True)
+					submit(ziplocation, False)
+				else:
+					ziplocation = glob.glob(target_zip + '/*.zip', recursive=False)
+					submit(ziplocation, False)
 			with open(target_zip, 'rb') as f:
 				# Generate SHA256 for file
 				h  = hashlib.sha256()
 				b  = bytearray(128*1024)
 				mv = memoryview(b)
+				zipsha256 = ""
 				for n in iter(lambda : f.readinto(mv), 0):
 					h.update(mv[:n])
 					zipsha256 = h.hexdigest()
-			if validateZip(target_zip, zipsha256):
-				# Submit New Kit
-				headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
-				data = {}
-				data['file_name'] = os.path.basename(target_zip)
-				try:
-					# POST request to the endpoint
-					response = requests.post(URL_Endpoint + "/submit", headers=headers, data=json.dumps(data))
-				except Exception as e:
+				if len(zipsha256) < 256:
 					# Error
-					print("ERROR\t- Failed request to submit")
-					print (response.text)
-					exit()
-				# OK
-				if response.status_code == 200:
-					result = response.json()
-					target_url = (result['url'])
-					headers = {'Content-Type': 'application/binary'}
-					# Save file binary data ready for upload
-					f = open(target_zip, 'rb')
-					data = f.read()
-					f.close()
-					try:
-						# PUT request to the endpoint
-						upload = requests.put(target_url, data=data, headers=headers)
-						if upload.status_code == 200:
-							# OK
-							print ("SUCCESS\t- File submitted\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
-						else:
-							# Error
-							print ("ERROR\t- Upload failed\t\t- Status code: " + str(upload.status_code))
-					except Exception as e:
-						# Error
-						print ("ERROR\t- Failed PUT request")
-						print (e)
+					print("ERROR\t- Not a valid zip\t- kit.kitname: {}".format(str(os.path.basename(target_zip))))
 				else:
-					print ("ERROR\t- Failed POST\t- Status code: " + str(response.status_code))
+					if validateZip(target_zip, zipsha256):
+						# Submit New Kit
+						headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
+						data = {}
+						data['file_name'] = os.path.basename(target_zip)
+						try:
+							# POST request to the endpoint
+							response = requests.post(URL_Endpoint + "/submit", headers=headers, data=json.dumps(data))
+						except Exception as e:
+							# Error
+							print("ERROR\t- Failed request to submit")
+							print (response.text)
+							exit()
+						# OK
+						if response.status_code == 200:
+							result = response.json()
+							target_url = (result['url'])
+							headers = {'Content-Type': 'application/binary'}
+							# Save file binary data ready for upload
+							f = open(target_zip, 'rb')
+							data = f.read()
+							f.close()
+							try:
+								# PUT request to the endpoint
+								upload = requests.put(target_url, data=data, headers=headers)
+								if upload.status_code == 200:
+									# OK
+									print ("SUCCESS\t- File submitted\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
+								else:
+									# Error
+									print ("ERROR\t- Upload failed\t\t- Status code: " + str(upload.status_code))
+							except Exception as e:
+								# Error
+								print ("ERROR\t- Failed PUT request")
+								print (e)
+						else:
+							print ("ERROR\t- Failed POST\t- Status code: " + str(response.status_code))
 
-				# Slow down multi-kit ingest to avoid duplicate kit overlaps
-				time.sleep(2)
+						# Slow down multi-kit ingest to avoid duplicate kit overlaps
+						time.sleep(2)
 	except OSError as e:
 		# Handle if a directory is inputted
 		if e.errno == 21:
-			ziplocation = []
-			for file in os.listdir(target_zip):
-				if file.lower().endswith('.zip'):
-					ziplocation.append(file)
-			# Scan zip files in directory
-			submit(ziplocation)
+			pass
 	except Exception as e:
+		# Error
+		print ("ERROR\t- Error in kit submission")
 		print (e)
 
 
@@ -323,7 +336,8 @@ def main():
 	# Submit Parser
 	# -f file
 	parser_retrieve = subparsers.add_parser('submit', help='Submit a phishing kit for analysis - Submit a single file, multiple files, or a directory')
-	parser_retrieve.add_argument('-f', '--file', help='Zip file(s) to submit', nargs='+', required='True')
+	parser_retrieve.add_argument('-f', '--file', help='Zip file(s) to submit or directory', nargs='+', required='True')
+	parser_retrieve.add_argument('-r', '--recursive', help='Enable directory recursion', action="store_true")
 
 	args = parser.parse_args()
 
@@ -335,7 +349,7 @@ def main():
 		download_content(args.uuid, args.download, args.json)
 	# Submit
 	elif args.command == 'submit':
-		submit(args.file)
+		submit(args.file, args.recursive)
 	else:
 		# Error
 		parser.print_help()
