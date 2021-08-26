@@ -12,11 +12,10 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.6.10
+Version :: V2.6.11
 
 Change log:
-	- Building for package distribution
-	- Removed global args variables
+	- Rebuilt the search input to validate searches and be more robust to code searches
 
 ''' 
 
@@ -27,6 +26,7 @@ import requests
 import os
 import hashlib
 import errno
+import re
 
 ## Global Config options
 # Content download location
@@ -123,21 +123,42 @@ def search(searchInput, filterInput, numberInput, dateInput):
 		data["datetime_filter"] = date
 
 	# Split search parameters
-	search_array = searchInput.replace(':', ',')
-	search_array = search_array.split(',')
+	search_array = searchInput.split(',')
 
-	try:
-		# Iterate though key value search items
-		for i in range(0, len(search_array),2):
-			data[search_array[i].replace(' ', '')] = search_array[i+1]
-	except IndexError:
-		print ("ERROR\t- Missing key value pair in search")
-		exit()
-	except Exception as e:
-		print ("ERROR\t- Error in search JSON")
-		print (e)
+	# Regex pattern to split keyword and search variable
+	# Fine first occournace of : and then capture the rest of the string
+	pattern = r"([^:]*)(.*)"
 
+	# Loop through the search input
+	for i in range(len(search_array)):
+		try:
+			# Extract the regex results
+			matchObj = re.search(pattern, search_array[i])
+			# Check there are hits from the regex
+			if matchObj:
+				# Strip away a space in the keyword
+				keyword = str(matchObj.group(1)).replace(' ', '')
+				# Strip char 1 from the value which will always be a ':' due to the regex
+				value = str(matchObj.group(2)[1:])
+				# Check to ensure the keyword is able to be searched
+				if keyword in ('content', 'datetime_filter', 'filename', 'filetype', 'fullfilename', 'kit.filetype', 'kit.kitname', 'kit.md5', 'kit.sha256', 'kit.size', 'kit.ssdeep', 'kit.UUID', 'md5', 'sha256', 'size', 'size_filter', 'ssdeep', 'UUID'):
+					data[keyword] = value
+				else:
+					# Error
+					print ("ERROR\t- '{}' - This is an unknown search term. Please try again".format(keyword))
+					exit()
+			else:
+				# Error	
+				print ("ERROR\t- Invalid key:value pair")
+				exit()
+		except Exception as e:
+			# Error
+			print ("ERROR\t- Ensure search is valid with keyword:searchTerm")
+			raise e
+
+	# Generate the JSON object from the search dictionary
 	data = json.dumps(data)
+	
 	try:
 		# POST request to the endpoint
 		response = requests.post(URL_Endpoint + "/search", data=data, headers=headers)
