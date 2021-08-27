@@ -12,10 +12,10 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.6.12.2
+Version :: V2.6.12.3
 
 Change log:
-	- Added recursive submission feature
+	- Sleep command on duplicate checker to avoid API rate limiting
 
 ''' 
 
@@ -186,6 +186,8 @@ def duplicateChecker(target_zip, zipsha256):
 		data['kit.sha256'] = zipsha256
 		data = json.dumps(data)
 		try:
+			# Slow down multi-kit ingest to avoid duplicate kit overlaps
+			time.sleep(0.12)
 			# POST request to the endpoint
 			response = requests.post(URL_Endpoint + "/search", data=data, headers=headers)
 			result = json.loads(response.text)
@@ -198,6 +200,8 @@ def duplicateChecker(target_zip, zipsha256):
 		except Exception as e:
 			# Error
 			print ("ERROR\t- Failed hash search")
+			print (response.status_code)
+			print (result)
 			print (e)
 	except Exception as e:
 		# Error
@@ -306,8 +310,6 @@ def submit(ziplocation, recursive):
 							else:
 								print ("ERROR\t- Failed POST\t- Status code: " + str(response.status_code))
 
-							# Slow down multi-kit ingest to avoid duplicate kit overlaps
-							time.sleep(2)
 
 	except OSError as e:
 		# Handle if a directory is inputted
