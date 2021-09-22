@@ -12,10 +12,10 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.6.12.3
+Version :: V2.7
 
 Change log:
-	- Sleep command on duplicate checker to avoid API rate limiting
+	- Added scroll_id as search key
 
 ''' 
 
@@ -144,7 +144,7 @@ def search(searchInput, filterInput, numberInput, dateInput):
 				# Strip char 1 from the value which will always be a ':' due to the regex
 				value = str(matchObj.group(2)[1:])
 				# Check to ensure the keyword is able to be searched
-				if keyword in ('content', 'datetime_filter', 'filename', 'filetype', 'fullfilename', 'kit.filetype', 'kit.kitname', 'kit.md5', 'kit.sha256', 'kit.size', 'kit.ssdeep', 'kit.UUID', 'md5', 'sha256', 'size', 'size_filter', 'ssdeep', 'UUID'):
+				if keyword in ('scroll_id', 'content', 'datetime_filter', 'filename', 'filetype', 'fullfilename', 'kit.filetype', 'kit.kitname', 'kit.md5', 'kit.sha256', 'kit.size', 'kit.ssdeep', 'kit.UUID', 'md5', 'sha256', 'size', 'size_filter', 'ssdeep', 'UUID', 'scroll_id'):
 					data[keyword] = value
 				else:
 					# Error
@@ -200,13 +200,9 @@ def duplicateChecker(target_zip, zipsha256):
 		except Exception as e:
 			# Error
 			print ("ERROR\t- Failed hash search")
-			print (response.status_code)
-			print (result)
-			print (e)
 	except Exception as e:
 		# Error
 		print ("ERROR\t- Duplicate checker error")
-		print (e)
 
 # Function to validate zip file before submission
 def validateZip(target_zip, zipsha256):
