@@ -12,10 +12,10 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.7
+Version :: V2.7.1
 
 Change log:
-	- Added scroll_id as search key
+	- Upload Error caused to a API key change
 
 ''' 
 
@@ -144,7 +144,7 @@ def search(searchInput, filterInput, numberInput, dateInput):
 				# Strip char 1 from the value which will always be a ':' due to the regex
 				value = str(matchObj.group(2)[1:])
 				# Check to ensure the keyword is able to be searched
-				if keyword in ('scroll_id', 'content', 'datetime_filter', 'filename', 'filetype', 'fullfilename', 'kit.filetype', 'kit.kitname', 'kit.md5', 'kit.sha256', 'kit.size', 'kit.ssdeep', 'kit.UUID', 'md5', 'sha256', 'size', 'size_filter', 'ssdeep', 'UUID', 'scroll_id'):
+				if keyword in ('scroll_id', 'content', 'datetime_filter', 'filename', 'filetype', 'fullfilename', 'kit.filetype', 'kit.kitname', 'kit.md5', 'kit.sha256', 'kit.size', 'kit.ssdeep', 'kit.UUID', 'md5', 'sha256', 'size', 'size_filter', 'ssdeep', 'UUID'):
 					data[keyword] = value
 				else:
 					# Error
@@ -191,7 +191,7 @@ def duplicateChecker(target_zip, zipsha256):
 			# POST request to the endpoint
 			response = requests.post(URL_Endpoint + "/search", data=data, headers=headers)
 			result = json.loads(response.text)
-			if result['count']:
+			if result['total_count']:
 				# Found duplicates
 				return True
 			else:
@@ -266,7 +266,7 @@ def submit(ziplocation, recursive):
 					# Check to ensure hash has generated
 					if len(zipsha256) < 64:
 						# Error
-						print("ERROR\t- Not a valid zip\t- kit.kitname: {}".format(str(os.path.basename(target_zip))))
+						print("ERROR\t- Not a valid zip\t\t- kit.kitname: {}".format(str(os.path.basename(target_zip))))
 					else:
 						if validateZip(target_zip, zipsha256):
 							# Submit New Kit
