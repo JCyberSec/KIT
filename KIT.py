@@ -12,12 +12,13 @@ Command line tool to enable easier use of WMC Global KIT API
 For API key please contact WMC Global :: https://www.wmcglobal.com/contact
 
 Author :: Jake 
-Version :: V2.7.1
+
 
 Change log:
-	- Upload Error caused to a API key change
-
+	- changed submission url key value due to API change
 ''' 
+__version__ = '2.7.5'
+
 
 # Import Table
 import argparse
@@ -65,7 +66,7 @@ def download_content(uuidInput, downloadInput, jsonInput):
 					print (result)
 				else:
 					# extract the content download URL
-					target_url = (result['content'])
+					target_url = (result['download_url'])
 					response = requests.get("{}".format(target_url))
 					if response.status_code == 200:
 						# If saving to file
@@ -284,7 +285,7 @@ def submit(ziplocation, recursive):
 							# OK
 							if response.status_code == 200:
 								result = response.json()
-								target_url = (result['url'])
+								target_url = (result['upload_url'])
 								headers = {'Content-Type': 'application/binary'}
 								# Save file binary data ready for upload
 								f = open(target_zip, 'rb')
@@ -344,6 +345,8 @@ def main():
 	parser_retrieve = subparsers.add_parser('submit', help='Submit a phishing kit for analysis - Submit a single file, multiple files, or a directory')
 	parser_retrieve.add_argument('-f', '--file', help='Zip file(s) to submit or directory', nargs='+', required='True')
 	parser_retrieve.add_argument('-r', '--recursive', help='Enable directory recursion', action="store_true")
+
+	parser.add_argument('-v', '--version', action='version', version='%(prog)s-{version}'.format(version=__version__))
 
 	args = parser.parse_args()
 
