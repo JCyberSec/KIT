@@ -15,9 +15,9 @@ Author :: Jake
 
 
 Change log:
-	- changed submission url key value due to API change
+	- Adding new search items to allow for file or kit prefixes
 ''' 
-__version__ = '2.7.5'
+__version__ = '2.7.6'
 
 
 # Import Table
@@ -145,7 +145,34 @@ def search(searchInput, filterInput, numberInput, dateInput):
 				# Strip char 1 from the value which will always be a ':' due to the regex
 				value = str(matchObj.group(2)[1:])
 				# Check to ensure the keyword is able to be searched
-				if keyword in ('scroll_id', 'content', 'datetime_filter', 'filename', 'filetype', 'fullfilename', 'kit.filetype', 'kit.kitname', 'kit.md5', 'kit.sha256', 'kit.size', 'kit.ssdeep', 'kit.UUID', 'md5', 'sha256', 'size', 'size_filter', 'ssdeep', 'UUID'):
+				if keyword in (
+					"content",
+					"datetime_filter",
+					"file.filename",
+					"file.filetype",
+					"file.md5",
+					"file.sha256",
+					"file.size",
+					"file.ssdeep",
+					"file.UUID",
+					"filename",
+					"filetype",
+					"fullfilename",
+					"kit.filetype",
+					"kit.kitname",
+					"kit.md5",
+					"kit.sha256",
+					"kit.size",
+					"kit.ssdeep",
+					"kit.UUID",
+					"md5",
+					"scroll_id",
+					"sha256",
+					"size",
+					"size_filter",
+					"ssdeep",
+					"UUID",
+				):
 					data[keyword] = value
 				else:
 					# Error
