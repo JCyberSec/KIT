@@ -95,12 +95,13 @@ optional arguments:
 ```
 ---
 ```
-usage: KIT.py submit [-h] -f FILE [FILE ...]
+usage: kitintel submit [-h] -f FILE [FILE ...] [-r]
 
 optional arguments:
   -h, --help            show this help message and exit
   -f FILE [FILE ...], --file FILE [FILE ...]
-                        Zip file(s) to submit
+                        Zip file(s) to submit or directory
+  -r, --recursive       Enable directory recursion
 ```
 ---
 # Sample Usage <a name="sample"></a>
