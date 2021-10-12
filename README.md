@@ -68,7 +68,7 @@ optional arguments:
 ```
 ---
 ```
-usage: mainV2.3.py search [-h] -s SEARCH [-f FILTER] [-n NUMBER] [-d DATE]
+usage: kitintel search [-h] -s SEARCH [-f FILTER] [-n NUMBER] [-d DATE] [--format {json,csv}] [--download]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -78,7 +78,9 @@ optional arguments:
                         Filter return keys. Split multiple keys with a comma
   -n NUMBER, --number NUMBER
                         Number of items to return - Default 100
-  -d DATE, --date DATE  Date range to search - 24h, 30d, 90d etc.
+  -d DATE, --date DATE  Relative date to search - Examples: 3h, 6d, 9w - Default 1y
+  --format {json,csv}   Change output format - Default unformatted json
+  --download            Download output to file
 ```
 ---
 ```
