@@ -15,9 +15,11 @@ Author :: Jake
 
 
 Change log:
-	- Adding new search items to allow for file or kit prefixes
+	- Added search formating option
+	- Removed content json option
+	- Added version auto checker
 ''' 
-__version__ = '2.7.6'
+__version__ = '2.7.7'
 
 
 # Import Table
@@ -30,6 +32,10 @@ import errno
 import re
 import glob
 import time
+import uuid
+from copy import deepcopy
+import pandas
+import feedparser
 
 
 ## Global Config options
@@ -47,9 +53,25 @@ except Exception as e:
 # KIT URL base endpoint
 URL_Endpoint = 'https://api.phishfeed.com/KIT/v1'
 
+def saveToFile(content, uuid, filetype):
+	try:
+		# Create the file, then write to the same file. This ensures files are not overwritten
+		f = open(str(Default_Download_Location) + '/' + str(uuid) + '.' + str(filetype), 'x')
+		f = open(str(Default_Download_Location) + '/' + str(uuid) + '.' + str(filetype), 'w')
+		f.write(content)
+		f.close()
+		# OK
+		print ("OK\t- Content downloaded to: {}/{}.{}".format(str(Default_Download_Location), str(uuid), str(filetype)))
+	except OSError as e:
+		if e.errno == errno.EEXIST:
+			# Error
+			print("ERROR\t- File already exists {}/{}.txt".format(str(Default_Download_Location), str(uuid)))
+		else:
+			# Error
+			print("ERROR\t- Failed to write file\t -{}".format(uuid))
 
 # Function to access content API
-def download_content(uuidInput, downloadInput, jsonInput):
+def content(uuidInput, downloadInput):
 	# Allow for multiple UUIDs
 	for target_uuid in uuidInput:
 		try:
@@ -61,38 +83,21 @@ def download_content(uuidInput, downloadInput, jsonInput):
 			response = requests.post(URL_Endpoint + "/content", headers=headers, data=json.dumps(data))
 			if response.status_code == 200:
 				result = response.json()
-				# If json argument print the returned JSON object to screen
-				if jsonInput:
-					print (result)
-				else:
-					# extract the content download URL
-					target_url = (result['download_url'])
-					response = requests.get("{}".format(target_url))
-					if response.status_code == 200:
-						# If saving to file
-						if downloadInput:
-							try:
-								# Create the file, then write to the same file. This ensures files are not overwritten
-								f = open(str(Default_Download_Location) + '/' + str(target_uuid) + '.txt', 'x')
-								f = open(str(Default_Download_Location) + '/' + str(target_uuid) + '.txt', 'w')
-								f.write(response.text)
-								f.close()
-								# OK
-								print ("OK\t- Content downloaded to: {}/{}.txt".format(str(Default_Download_Location), str(target_uuid)))
-							except OSError as e:
-								if e.errno == errno.EEXIST:
-									# Error
-									print("ERROR\t- File already exists {}/{}.txt".format(str(Default_Download_Location), str(target_uuid)))
-								else:
-									# Error
-									print("ERROR\t- Failed to write file\t -{}".format(target_uuid))
-						else:
-							# If download not selected, content will be printed to screen
-							print (response.text)
+				# extract the content download URL
+				target_url = (result['download_url'])
+				response = requests.get("{}".format(target_url))
+				if response.status_code == 200:
+					# If saving to file
+					if downloadInput:
+						saveToFile(response.text, target_uuid, 'txt')
+						exit()
 					else:
-						# Error
-						print("ERROR\t- Failed to download content for {}".format(target_uuid))
+						# If download not selected, content will be printed to screen
 						print (response.text)
+				else:
+					# Error
+					print("ERROR\t- Failed to download content for {}".format(target_uuid))
+					print (response.text)
 			else:
 				# Error
 				print("ERROR\t- Failed to request content for {}".format(target_uuid))
@@ -102,16 +107,83 @@ def download_content(uuidInput, downloadInput, jsonInput):
 			print("ERROR\t- Failed to parse {}".format(target_uuid))
 			print (e)
 
+def cross_join(left, right):
+	new_rows = [] if right else left
+	for left_row in left:
+		for right_row in right:
+			temp_row = deepcopy(left_row)
+			for key, value in right_row.items():
+				temp_row[key] = value
+			new_rows.append(deepcopy(temp_row))
+	return new_rows
+
+
+def flatten_list(data):
+	for elem in data:
+		if isinstance(elem, list):
+			yield from flatten_list(elem)
+		else:
+			yield elem
+
+
+def json_to_dataframe(data_in):
+	def flatten_json(data, prev_heading=''):
+		if isinstance(data, dict):
+			rows = [{}]
+			for key, value in data.items():
+				rows = cross_join(rows, flatten_json(value, prev_heading + '.' + key))
+		elif isinstance(data, list):
+			rows = []
+			for i in range(len(data)):
+				[rows.append(elem) for elem in flatten_list(flatten_json(data[i], prev_heading))]
+		else:
+			rows = [{prev_heading[1:]: data}]
+		return rows
+
+	return pandas.DataFrame(flatten_json(data_in))
+
 # Function to search KIT
-def search(searchInput, filterInput, numberInput, dateInput):
+def search(searchInput, filterInput, numberInput, dateInput, formatInput, downloadInput):
 	headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
 	data = {}
 	
 	# Parse filter argument
 	if filterInput:
 		filterItems = []
-		for i in filterInput.split(','):
-			filterItems.append(i.strip())
+		for keyword in filterInput.split(','):
+			keyword = keyword.strip()
+			if keyword in (
+				"datetime",
+				"file.filename",
+				"file.filetype",
+				"file.md5",
+				"file.sha256",
+				"file.size",
+				"file.ssdeep",
+				"file.UUID",
+				"filename",
+				"filetype",
+				"fullfilename",
+				"kit.filetype",
+				"kit.kitname",
+				"kit.md5",
+				"kit.sha256",
+				"kit.size",
+				"kit.ssdeep",
+				"kit.UUID",
+				"md5",
+				"scroll_id",
+				"sha256",
+				"size",
+				"size_filter",
+				"ssdeep",
+				"UUID"
+			):
+				filterItems.append(keyword)
+			else:
+				# Error
+				print ("ERROR\t- '{}' - Unknown filter term. Please try again".format(keyword))
+				exit()
 
 		data["filter"] = filterItems
 		filterData = (filterItems)
@@ -171,12 +243,12 @@ def search(searchInput, filterInput, numberInput, dateInput):
 					"size",
 					"size_filter",
 					"ssdeep",
-					"UUID",
+					"UUID"
 				):
 					data[keyword] = value
 				else:
 					# Error
-					print ("ERROR\t- '{}' - This is an unknown search term. Please try again".format(keyword))
+					print ("ERROR\t- '{}' - Unknown search term. Please try again".format(keyword))
 					exit()
 			else:
 				# Error	
@@ -194,7 +266,29 @@ def search(searchInput, filterInput, numberInput, dateInput):
 		# POST request to the endpoint
 		response = requests.post(URL_Endpoint + "/search", data=data, headers=headers)
 		if response.status_code == 200:
-			print (response.text)
+			if formatInput == 'json':
+				parsed = json.loads(response.text)
+				content = json.dumps(parsed, indent=4, sort_keys=False)
+				if downloadInput:
+					target_uuid = uuid.uuid4()
+					saveToFile(content, target_uuid, 'json')
+				else:
+					print(content)
+			elif formatInput == 'csv':
+				parsed = json.loads(response.text)
+				df = json_to_dataframe(parsed)
+				content = df.to_csv()
+				if downloadInput:
+					target_uuid = uuid.uuid4()
+					saveToFile(content, target_uuid, 'csv')
+				else:
+					print(content)
+			else:
+				if downloadInput:
+					target_uuid = uuid.uuid4()
+					saveToFile(response.text, target_uuid, 'json')
+				else:
+					print (response.text)
 		else:
 			# Error
 			print("ERROR\t- Failed search")
@@ -349,29 +443,32 @@ def submit(ziplocation, recursive):
 # Main Function
 def main():
 	## Argparse Arguments
-	parser = argparse.ArgumentParser(prog ='kitintel', description="The phishing Kit Intelligence Tracker (KIT) APIs are a set of static analysis tools for investigating and comparing phishing kit content within single or multiple kits.\n It can search file hashes, search file content, retrieve content, and submit kits to KIT for cross-analysis.")
+	parser = argparse.ArgumentParser(prog ='kitintel',
+									 description="The phishing Kit Intelligence Tracker (KIT) APIs are a set of static analysis tools for investigating and comparing phishing kit content within single or multiple kits.\n It can search file hashes, search file content, retrieve content, and submit kits to KIT for cross-analysis.",
+									 epilog="\n For more information or assistance with KIT - Please speak to your account manager or contact WMC Global")
 	subparsers = parser.add_subparsers(help='Commands Available', dest='command')
 
 	# Search Parser
-	# -s search, -f filter, -n number, -d date
+	# -s search, -f filter, -n number, -d date, --for format
 	parser_search = subparsers.add_parser('search', help='Search KIT Intel - Search on kit names, hashes, code content, directory names')
 	parser_search.add_argument('-s', '--search', help='Search term', required='True')
 	parser_search.add_argument('-f', '--filter', help='Filter return keys. Split multiple keys with a comma')
 	parser_search.add_argument('-n', '--number', help='Number of items to return - Default 100', default=100)
-	parser_search.add_argument('-d', '--date', help='Date range to search - 24h, 30d etc. - Default 1y', default="1y")
+	parser_search.add_argument('-d', '--date', help='Relative date to search - Examples: 3h, 6d, 9w - Default 1y', default="1y")
+	parser_search.add_argument('--format', choices=['json', 'csv'], help='Change output format - Default unformatted json', default='None')
+	parser_search.add_argument('--download', help='Download output to file', action="store_true")
 
 	# Content Parser
-	# -u uuid, -d download, -j json
-	parser_retrieve = subparsers.add_parser('content', help='Download file content - Default behavior is to print to screen, file can also be downloaded into the current working directory')
-	parser_retrieve.add_argument('-u', '--uuid', help='UUID(s) to retrieve scans for', nargs='+', required='True')
-	parser_retrieve.add_argument('-d', '--download', help='Download content to file', action="store_true")
-	parser_retrieve.add_argument('-j', '--json', help='Print JSON data', action="store_true")
+	# -u uuid, -d download
+	parser_content = subparsers.add_parser('content', help='Download file content - Default behavior is to print to screen, file can also be downloaded into the current working directory')
+	parser_content.add_argument('-u', '--uuid', help='UUID(s) to retrieve scans for', nargs='+', required='True')
+	parser_content.add_argument('-d', '--download', help='Download content to file', action="store_true")
 
 	# Submit Parser
-	# -f file
-	parser_retrieve = subparsers.add_parser('submit', help='Submit a phishing kit for analysis - Submit a single file, multiple files, or a directory')
-	parser_retrieve.add_argument('-f', '--file', help='Zip file(s) to submit or directory', nargs='+', required='True')
-	parser_retrieve.add_argument('-r', '--recursive', help='Enable directory recursion', action="store_true")
+	# -f file, -r recursive
+	parser_submit = subparsers.add_parser('submit', help='Submit a phishing kit for analysis - Submit a single file, multiple files, or a directory')
+	parser_submit.add_argument('-f', '--file', help='Zip file(s) to submit or directory', nargs='+', required='True')
+	parser_submit.add_argument('-r', '--recursive', help='Enable directory recursion', action="store_true")
 
 	parser.add_argument('-v', '--version', action='version', version='%(prog)s-{version}'.format(version=__version__))
 
@@ -379,10 +476,10 @@ def main():
 
 	# Search
 	if args.command == 'search':
-		search(args.search, args.filter, args.number, args.date)
+		search(args.search, args.filter, args.number, args.date, args.format, args.download)
 	# Content
 	elif args.command == 'content':
-		download_content(args.uuid, args.download, args.json)
+		content(args.uuid, args.download)
 	# Submit
 	elif args.command == 'submit':
 		submit(args.file, args.recursive)
@@ -390,5 +487,17 @@ def main():
 		# Error
 		parser.print_help()
 
+def versionCheck():
+	try:
+		latest_ver = feedparser.parse('https://pypi.org/rss/project/kitintel/releases.xml')['entries'][0]['title']
+		if latest_ver != __version__:
+			print ("\n\nWARNING: You are using kitintel version {}; however, version {} is available. You should consider upgrading by running:".format(__version__, latest_ver))
+			print ("pip3 install kitintel --upgrade")
+
+	except Exception as e:
+		# Error
+		pass
+
 if __name__ == '__main__':
 	main()
+	versionCheck()
