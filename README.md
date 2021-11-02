@@ -39,8 +39,10 @@ $ export KITAPI="APIKEY"
 :red_circle: Search
   - -s / --search :: The search term
   - -f / --filter :: Filter return keys. Split multiple keys with a comma
-  - -n / --number :: Number of items to return (Default=100)
+  - -n / --number :: Number of items to return. (Default=100)
   - -d / --date :: Date range to search - 24h, 30d, 90d etc. (Default=24h)
+  - --format :: Change output format - Options are JSON, unformatted JSON, CSV. (Default unformatted json)
+  - --download :: Download output to file
 
 :yellow_circle: Content
   - -u / --uuid :: UUID(s) to retrieve content for - Can submit multiple either comma or space separated 
@@ -49,6 +51,7 @@ $ export KITAPI="APIKEY"
 
 :large_blue_circle: Submit
   - -f / --file :: Submit a phishing kit for analysis. Submit a single file, multiple files, or a directory
+  - -r / --recursive :: Enable directory recursion
 
 # Technical Usage <a name="technical"></a>
 ```
@@ -106,7 +109,7 @@ optional arguments:
 ---
 # Sample Usage <a name="sample"></a>
 ```
-$ python3 KIT.py search -s 'content:google, filetype: php' -d 3d -f 'kit.UUID, filename' -n 3
+$ python3 KIT.py search  -s 'content:google, file.filetype: php' -d 3d -f 'kit.UUID, file.filename' -n 3
 $ python3 KIT.py content -u 2e517c8f-9375-4f55-a503-ca5bbd4d4a5b
-$ python3 KIT.py submit -f ./16shop_V8.1_CRACKED.zip
+$ python3 KIT.py submit  -f 16shop_V8.1_CRACKED.zip
 ```

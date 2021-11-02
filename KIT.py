@@ -15,11 +15,9 @@ Author :: Jake
 
 
 Change log:
-	- Added search formating option
-	- Removed content json option
-	- Added version auto checker
+	- Support for upload only users
 ''' 
-__version__ = '2.7.7'
+__version__ = '2.7.8'
 
 
 # Import Table
@@ -98,6 +96,8 @@ def content(uuidInput, downloadInput):
 					# Error
 					print("ERROR\t- Failed to download content for {}".format(target_uuid))
 					print (response.text)
+			elif response.status_code == 403:
+				print ("ERROR\t- Forbidden")
 			else:
 				# Error
 				print("ERROR\t- Failed to request content for {}".format(target_uuid))
@@ -289,6 +289,8 @@ def search(searchInput, filterInput, numberInput, dateInput, formatInput, downlo
 					saveToFile(response.text, target_uuid, 'json')
 				else:
 					print (response.text)
+		elif response.status_code == 403:
+			print ("ERROR\t- Forbidden")
 		else:
 			# Error
 			print("ERROR\t- Failed search")
@@ -312,6 +314,9 @@ def duplicateChecker(target_zip, zipsha256):
 			time.sleep(0.12)
 			# POST request to the endpoint
 			response = requests.post(URL_Endpoint + "/search", data=data, headers=headers)
+			if response.status_code == 403:
+				print ("Uploader only restrictions apply - ", end='')
+				return False
 			result = json.loads(response.text)
 			if result['total_count']:
 				# Found duplicates
@@ -322,9 +327,11 @@ def duplicateChecker(target_zip, zipsha256):
 		except Exception as e:
 			# Error
 			print ("ERROR\t- Failed hash search")
+			print (e)
 	except Exception as e:
 		# Error
 		print ("ERROR\t- Duplicate checker error")
+		print (e)
 
 # Function to validate zip file before submission
 def validateZip(target_zip, zipsha256):
@@ -336,7 +343,7 @@ def validateZip(target_zip, zipsha256):
 				if header_byte == '504b0304':
 					if duplicateChecker(target_zip, zipsha256):
 						# File present in KIT already
-						print ("OK\t- File present in KIT\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
+						print ("OK\t- Kit already present in KIT\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
 						f.close()
 						return False
 				else:
@@ -425,6 +432,8 @@ def submit(ziplocation, recursive):
 									# Error
 									print ("ERROR\t- Failed PUT request")
 									print (e)
+							if response.status_code == 403:
+								print ("ERROR\t- Forbidden")
 							else:
 								print ("ERROR\t- Failed POST\t- Status code: " + str(response.status_code))
 
@@ -449,7 +458,7 @@ def main():
 	subparsers = parser.add_subparsers(help='Commands Available', dest='command')
 
 	# Search Parser
-	# -s search, -f filter, -n number, -d date, --for format
+	# -s search, -f filter, -n number, -d date, --format, --download
 	parser_search = subparsers.add_parser('search', help='Search KIT Intel - Search on kit names, hashes, code content, directory names')
 	parser_search.add_argument('-s', '--search', help='Search term', required='True')
 	parser_search.add_argument('-f', '--filter', help='Filter return keys. Split multiple keys with a comma')
