@@ -15,25 +15,45 @@ Author :: Jake
 
 
 Change log:
-	- Support for upload only users
+	- Added unique feature
+	- Refactored elements
 ''' 
-__version__ = '2.7.8'
+__version__ = '2.7.10'
 
 
 # Import Table
-import argparse
-import json
-import requests
-import os
-import hashlib
-import errno
-import re
-import glob
-import time
-import uuid
-from copy import deepcopy
-import pandas
-import feedparser
+try:
+	import argparse
+	import json
+	import requests
+	import os
+	import hashlib
+	import errno
+	import re
+	import glob
+	import time
+	import uuid
+	from copy import deepcopy
+	import pandas
+	import feedparser
+	from typing import Dict, Any, List
+	import traceback
+except ModuleNotFoundError:
+	os.system('pip3 install argparse')
+	os.system('pip3 install json')
+	os.system('pip3 install requests')
+	os.system('pip3 install os')
+	os.system('pip3 install hashlib')
+	os.system('pip3 install errno')
+	os.system('pip3 install re')
+	os.system('pip3 install glob')
+	os.system('pip3 install time')
+	os.system('pip3 install uuid')
+	os.system('pip3 install copy')
+	os.system('pip3 install pandas')
+	os.system('pip3 install feedparser')
+	os.system('pip3 install typing')
+	os.system('pip3 install traceback')
 
 
 ## Global Config options
@@ -50,6 +70,41 @@ except Exception as e:
 
 # KIT URL base endpoint
 URL_Endpoint = 'https://api.phishfeed.com/KIT/v1'
+
+
+VAILD_KEYWORDS = {
+	"datetime": "datetime",
+	"content": "content",
+	"file.filename": "file.filename",
+	"file.filetype": "file.filetype",
+	"file.md5": "file.md5",
+	"file.sha256": "file.sha256",
+	"file.size": "file.size",
+	"file.ssdeep": "file.ssdeep",
+	"file.UUID": "file.UUID",
+	"filename": "file.filename",
+	"filetype": "file.filetype",
+	"fullfilename": "fullfilename",
+	"kit.filetype": "kit.filetype",
+	"kit.kitname": "kit.kitname",
+	"kit.md5": "kit.md5",
+	"kit.sha256": "kit.sha256",
+	"kit.size": "kit.size",
+	"kit.ssdeep": "kit.ssdeep",
+	"kit.UUID": "kit.UUID",
+	"md5": "file.md5",
+	"scroll_id": "scroll_id",
+	"sha256": "file.sha256",
+	"size": "file.size",
+	"size_filter": "size_filter",
+	"ssdeep": "file.ssdeep",
+	"UUID": "UUID",
+}
+
+
+
+
+
 
 def saveToFile(content, uuid, filetype):
 	try:
@@ -142,8 +197,19 @@ def json_to_dataframe(data_in):
 
 	return pandas.DataFrame(flatten_json(data_in))
 
+
+def recursive_get(value: Dict[str, Any], path: List[str], default: Any = None) -> Any:
+	current_point = value
+	for key in path:
+		try:
+			current_point = current_point[key]
+		except KeyError:
+			return default
+	return current_point
+
+
 # Function to search KIT
-def search(searchInput, filterInput, numberInput, dateInput, formatInput, downloadInput):
+def search(searchInput, filterInput, numberInput, dateInput, uniqueInput, formatInput, downloadInput):
 	headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
 	data = {}
 	
@@ -152,33 +218,8 @@ def search(searchInput, filterInput, numberInput, dateInput, formatInput, downlo
 		filterItems = []
 		for keyword in filterInput.split(','):
 			keyword = keyword.strip()
-			if keyword in (
-				"datetime",
-				"file.filename",
-				"file.filetype",
-				"file.md5",
-				"file.sha256",
-				"file.size",
-				"file.ssdeep",
-				"file.UUID",
-				"filename",
-				"filetype",
-				"fullfilename",
-				"kit.filetype",
-				"kit.kitname",
-				"kit.md5",
-				"kit.sha256",
-				"kit.size",
-				"kit.ssdeep",
-				"kit.UUID",
-				"md5",
-				"scroll_id",
-				"sha256",
-				"size",
-				"size_filter",
-				"ssdeep",
-				"UUID"
-			):
+			if keyword in VAILD_KEYWORDS.keys():
+				keyword = VAILD_KEYWORDS[keyword]
 				filterItems.append(keyword)
 			else:
 				# Error
@@ -187,7 +228,7 @@ def search(searchInput, filterInput, numberInput, dateInput, formatInput, downlo
 
 		data["filter"] = filterItems
 		filterData = (filterItems)
-	
+
 	# Parse number argument
 	if numberInput:
 		data["page_size"] = int(numberInput)
@@ -217,34 +258,8 @@ def search(searchInput, filterInput, numberInput, dateInput, formatInput, downlo
 				# Strip char 1 from the value which will always be a ':' due to the regex
 				value = str(matchObj.group(2)[1:])
 				# Check to ensure the keyword is able to be searched
-				if keyword in (
-					"content",
-					"datetime_filter",
-					"file.filename",
-					"file.filetype",
-					"file.md5",
-					"file.sha256",
-					"file.size",
-					"file.ssdeep",
-					"file.UUID",
-					"filename",
-					"filetype",
-					"fullfilename",
-					"kit.filetype",
-					"kit.kitname",
-					"kit.md5",
-					"kit.sha256",
-					"kit.size",
-					"kit.ssdeep",
-					"kit.UUID",
-					"md5",
-					"scroll_id",
-					"sha256",
-					"size",
-					"size_filter",
-					"ssdeep",
-					"UUID"
-				):
+				if keyword in VAILD_KEYWORDS.keys():
+					keyword = VAILD_KEYWORDS[keyword]
 					data[keyword] = value
 				else:
 					# Error
@@ -256,7 +271,7 @@ def search(searchInput, filterInput, numberInput, dateInput, formatInput, downlo
 				exit()
 		except Exception as e:
 			# Error
-			print ("ERROR\t- Ensure search is valid with keyword:searchTerm")
+			print ("ERROR\t- Ensure search is valid with keyword:search_term")
 			raise e
 
 	# Generate the JSON object from the search dictionary
@@ -265,40 +280,55 @@ def search(searchInput, filterInput, numberInput, dateInput, formatInput, downlo
 	try:
 		# POST request to the endpoint
 		response = requests.post(URL_Endpoint + "/search", data=data, headers=headers)
-		if response.status_code == 200:
-			if formatInput == 'json':
-				parsed = json.loads(response.text)
-				content = json.dumps(parsed, indent=4, sort_keys=False)
-				if downloadInput:
-					target_uuid = uuid.uuid4()
-					saveToFile(content, target_uuid, 'json')
-				else:
-					print(content)
-			elif formatInput == 'csv':
-				parsed = json.loads(response.text)
-				df = json_to_dataframe(parsed)
-				content = df.to_csv()
-				if downloadInput:
-					target_uuid = uuid.uuid4()
-					saveToFile(content, target_uuid, 'csv')
-				else:
-					print(content)
-			else:
-				if downloadInput:
-					target_uuid = uuid.uuid4()
-					saveToFile(response.text, target_uuid, 'json')
-				else:
-					print (response.text)
-		elif response.status_code == 403:
-			print ("ERROR\t- Forbidden")
-		else:
-			# Error
-			print("ERROR\t- Failed search")
-			print (response.text)
 	except Exception as e:
 		# Error
 		print("ERROR\t- Failed search POST")
-		print(e)
+		traceback.print_exc()
+
+	if response.status_code == 200:
+		parsed = json.loads(response.text)
+		# Parse unique argument
+		if uniqueInput:
+			keyword = uniqueInput.strip()
+			if keyword in VAILD_KEYWORDS.keys():
+				keyword = VAILD_KEYWORDS[keyword]
+				uniqueItem = VAILD_KEYWORDS[keyword].split('.')
+				parsed["results"] = list({ recursive_get(each,uniqueItem) : each for each in parsed["results"] }.values())
+				parsed["unique_count"] = len(parsed["results"])
+			else:
+				# Error
+				print ("ERROR\t- '{}' - Unknown unique term. Please try again".format(keyword))
+				exit()
+		if formatInput == 'json':
+			content = json.dumps(parsed, indent=4, sort_keys=False)
+			if downloadInput:
+				target_uuid = uuid.uuid4()
+				saveToFile(content, target_uuid, 'json')
+			else:
+				print(content)
+		elif formatInput == 'csv':
+			# parsed = json.loads(response.text)
+			# content = json.dumps(parsed)
+			df = json_to_dataframe(parsed)
+			content = df.to_csv()
+			if downloadInput:
+				target_uuid = uuid.uuid4()
+				saveToFile(content, target_uuid, 'csv')
+			else:
+				print(content)
+		else:
+			content = json.dumps(parsed)
+			if downloadInput:
+				target_uuid = uuid.uuid4()
+				saveToFile(content, target_uuid, 'json')
+			else:
+				print (content)
+	elif response.status_code == 403:
+		print ("ERROR\t- Forbidden")
+	else:
+		# Error
+		print("ERROR\t- Failed search")
+		print (response.text)
 
 # Function to prevent duplicate kit submission
 # Note: There is a duplication checker on the back end, this is to save wasting submission quotas
@@ -424,7 +454,7 @@ def submit(ziplocation, recursive):
 									upload = requests.put(target_url, data=data, headers=headers)
 									if upload.status_code == 200:
 										# OK
-										print ("SUCCESS\t- File submitted\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
+										print ("SUCCESS\t- File submitted\t\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
 									else:
 										# Error
 										print ("ERROR\t- Upload failed\t\t- Status code: " + str(upload.status_code))
@@ -432,7 +462,7 @@ def submit(ziplocation, recursive):
 									# Error
 									print ("ERROR\t- Failed PUT request")
 									print (e)
-							if response.status_code == 403:
+							elif response.status_code == 403:
 								print ("ERROR\t- Forbidden")
 							else:
 								print ("ERROR\t- Failed POST\t- Status code: " + str(response.status_code))
@@ -464,6 +494,7 @@ def main():
 	parser_search.add_argument('-f', '--filter', help='Filter return keys. Split multiple keys with a comma')
 	parser_search.add_argument('-n', '--number', help='Number of items to return - Default 100', default=100)
 	parser_search.add_argument('-d', '--date', help='Relative date to search - Examples: 3h, 6d, 9w - Default 1y', default="1y")
+	parser_search.add_argument('-u', '--unique', help='Print only unique values when given a key')
 	parser_search.add_argument('--format', choices=['json', 'csv'], help='Change output format - Default unformatted json', default='None')
 	parser_search.add_argument('--download', help='Download output to file', action="store_true")
 
@@ -485,7 +516,7 @@ def main():
 
 	# Search
 	if args.command == 'search':
-		search(args.search, args.filter, args.number, args.date, args.format, args.download)
+		search(args.search, args.filter, args.number, args.date, args.unique, args.format, args.download)
 	# Content
 	elif args.command == 'content':
 		content(args.uuid, args.download)
@@ -499,7 +530,7 @@ def main():
 def versionCheck():
 	try:
 		latest_ver = feedparser.parse('https://pypi.org/rss/project/kitintel/releases.xml')['entries'][0]['title']
-		if latest_ver != __version__:
+		if latest_ver < __version__:
 			print ("\n\nWARNING: You are using kitintel version {}; however, version {} is available. You should consider upgrading by running:".format(__version__, latest_ver))
 			print ("pip3 install kitintel --upgrade")
 

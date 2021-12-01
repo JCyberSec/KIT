@@ -40,17 +40,18 @@ $ export KITAPI="APIKEY"
   - -s / --search :: The search term
   - -f / --filter :: Filter return keys. Split multiple keys with a comma
   - -n / --number :: Number of items to return. (Default=100)
-  - -d / --date :: Date range to search - 24h, 30d, 90d etc. (Default=24h)
-  - --format :: Change output format - Options are JSON, unformatted JSON, CSV. (Default unformatted json)
-  - --download :: Download output to file
+  - -d / --date   :: Date range to search - 24h, 30d, 90d etc. (Default=24h)
+  - -u / --unique :: Print only unique values when given a key
+  - --format      :: Change output format - Options are JSON, unformatted JSON, CSV. (Default unformatted json)
+  - --download    :: Download output to file
 
 :yellow_circle: Content
-  - -u / --uuid :: UUID(s) to retrieve content for - Can submit multiple either comma or space separated 
+  - -u / --uuid     :: UUID(s) to retrieve content for - Can submit multiple either comma or space separated 
   - -d / --download :: Download content to file
-  - -j / --json :: Print return JSON 
+  - -j / --json     :: Print return JSON 
 
 :large_blue_circle: Submit
-  - -f / --file :: Submit a phishing kit for analysis. Submit a single file, multiple files, or a directory
+  - -f / --file      :: Submit a phishing kit for analysis. Submit a single file, multiple files, or a directory
   - -r / --recursive :: Enable directory recursion
 
 # Technical Usage <a name="technical"></a>
@@ -71,7 +72,7 @@ optional arguments:
 ```
 ---
 ```
-usage: kitintel search [-h] -s SEARCH [-f FILTER] [-n NUMBER] [-d DATE] [--format {json,csv}] [--download]
+usage: kitintel search [-h] -s SEARCH [-f FILTER] [-n NUMBER] [-d DATE] [-u UNIQUE] [--format {json,csv}] [--download]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -82,6 +83,8 @@ optional arguments:
   -n NUMBER, --number NUMBER
                         Number of items to return - Default 100
   -d DATE, --date DATE  Relative date to search - Examples: 3h, 6d, 9w - Default 1y
+  -u UNIQUE, --unique UNIQUE
+                        Print only unique values when given a key
   --format {json,csv}   Change output format - Default unformatted json
   --download            Download output to file
 ```
