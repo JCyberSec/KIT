@@ -15,45 +15,27 @@ Author :: Jake
 
 
 Change log:
-	- Added unique feature
-	- Refactored elements
+	- Emergency patch for imports
 ''' 
-__version__ = '2.7.10'
+__version__ = '2.7.11'
 
 
 # Import Table
-try:
-	import argparse
-	import json
-	import requests
-	import os
-	import hashlib
-	import errno
-	import re
-	import glob
-	import time
-	import uuid
-	from copy import deepcopy
-	import pandas
-	import feedparser
-	from typing import Dict, Any, List
-	import traceback
-except ModuleNotFoundError:
-	os.system('pip3 install argparse')
-	os.system('pip3 install json')
-	os.system('pip3 install requests')
-	os.system('pip3 install os')
-	os.system('pip3 install hashlib')
-	os.system('pip3 install errno')
-	os.system('pip3 install re')
-	os.system('pip3 install glob')
-	os.system('pip3 install time')
-	os.system('pip3 install uuid')
-	os.system('pip3 install copy')
-	os.system('pip3 install pandas')
-	os.system('pip3 install feedparser')
-	os.system('pip3 install typing')
-	os.system('pip3 install traceback')
+from copy import deepcopy
+from typing import Dict, Any, List
+import argparse
+import errno
+import feedparser
+import glob
+import hashlib
+import json
+import os
+import pandas
+import re
+import requests
+import time
+import traceback
+import uuid
 
 
 ## Global Config options
