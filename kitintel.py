@@ -4,6 +4,7 @@
 # | . \ | |  | |     \ V  V /| | | (_| | |_) | |_) |  __/ |   
 # |_|\_\___| |_|      \_/\_/ |_|  \__,_| .__/| .__/ \___|_|   
 #                                      |_|   |_|              
+#
 '''
 KIT Wrapper
 
@@ -15,13 +16,18 @@ Author :: Jake
 
 
 Change log:
-	- Emergency patch for imports
+	- Overhaul of upload system
+	- Added debug option
+	- Logic changes to submit process
+
 ''' 
-__version__ = '2.7.11'
+__version__ = '2.7.12'
 
 
 # Import Table
 from copy import deepcopy
+from tqdm import tqdm
+from tqdm.utils import CallbackIOWrapper
 from typing import Dict, Any, List
 import argparse
 import errno
@@ -31,8 +37,10 @@ import hashlib
 import json
 import os
 import pandas
+import pathlib
 import re
 import requests
+import shutil
 import time
 import traceback
 import uuid
@@ -52,7 +60,6 @@ except Exception as e:
 
 # KIT URL base endpoint
 URL_Endpoint = 'https://api.phishfeed.com/KIT/v1'
-
 
 VAILD_KEYWORDS = {
 	"datetime": "datetime",
@@ -83,12 +90,7 @@ VAILD_KEYWORDS = {
 	"UUID": "UUID",
 }
 
-
-
-
-
-
-def saveToFile(content, uuid, filetype):
+def saveToFile(content, uuid, filetype, debug):
 	try:
 		# Create the file, then write to the same file. This ensures files are not overwritten
 		f = open(str(Default_Download_Location) + '/' + str(uuid) + '.' + str(filetype), 'x')
@@ -101,12 +103,16 @@ def saveToFile(content, uuid, filetype):
 		if e.errno == errno.EEXIST:
 			# Error
 			print("ERROR\t- File already exists {}/{}.txt".format(str(Default_Download_Location), str(uuid)))
+			if debug:
+				traceback.print_exc()
 		else:
 			# Error
 			print("ERROR\t- Failed to write file\t -{}".format(uuid))
+			if debug:
+				traceback.print_exc()
 
 # Function to access content API
-def content(uuidInput, downloadInput):
+def content(uuidInput, downloadInput, debug):
 	# Allow for multiple UUIDs
 	for target_uuid in uuidInput:
 		try:
@@ -124,7 +130,7 @@ def content(uuidInput, downloadInput):
 				if response.status_code == 200:
 					# If saving to file
 					if downloadInput:
-						saveToFile(response.text, target_uuid, 'txt')
+						saveToFile(response.text, target_uuid, 'txt', debug)
 						exit()
 					else:
 						# If download not selected, content will be printed to screen
@@ -132,17 +138,25 @@ def content(uuidInput, downloadInput):
 				else:
 					# Error
 					print("ERROR\t- Failed to download content for {}".format(target_uuid))
-					print (response.text)
+					if debug:
+						traceback.print_exc()
+						print (response.text)
 			elif response.status_code == 403:
 				print ("ERROR\t- Forbidden")
+				if debug:
+					traceback.print_exc()
 			else:
 				# Error
 				print("ERROR\t- Failed to request content for {}".format(target_uuid))
-				print (response.text)
+				if debug:
+					traceback.print_exc()
+					print (response.text)
 		except Exception as e:
 			# Error
 			print("ERROR\t- Failed to parse {}".format(target_uuid))
-			print (e)
+			if debug:
+				traceback.print_exc()
+				print (e)
 
 def cross_join(left, right):
 	new_rows = [] if right else left
@@ -191,7 +205,7 @@ def recursive_get(value: Dict[str, Any], path: List[str], default: Any = None) -
 
 
 # Function to search KIT
-def search(searchInput, filterInput, numberInput, dateInput, uniqueInput, formatInput, downloadInput):
+def search(searchInput, filterInput, numberInput, dateInput, uniqueInput, formatInput, downloadInput, debug):
 	headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
 	data = {}
 	
@@ -206,6 +220,8 @@ def search(searchInput, filterInput, numberInput, dateInput, uniqueInput, format
 			else:
 				# Error
 				print ("ERROR\t- '{}' - Unknown filter term. Please try again".format(keyword))
+				if debug:
+					traceback.print_exc()
 				exit()
 
 		data["filter"] = filterItems
@@ -246,15 +262,20 @@ def search(searchInput, filterInput, numberInput, dateInput, uniqueInput, format
 				else:
 					# Error
 					print ("ERROR\t- '{}' - Unknown search term. Please try again".format(keyword))
+					if debug:
+						traceback.print_exc()
 					exit()
 			else:
 				# Error	
 				print ("ERROR\t- Invalid key:value pair")
+				if debug:
+					traceback.print_exc()
 				exit()
 		except Exception as e:
 			# Error
 			print ("ERROR\t- Ensure search is valid with keyword:search_term")
-			raise e
+			if debug:
+				traceback.print_exc()
 
 	# Generate the JSON object from the search dictionary
 	data = json.dumps(data)
@@ -265,7 +286,8 @@ def search(searchInput, filterInput, numberInput, dateInput, uniqueInput, format
 	except Exception as e:
 		# Error
 		print("ERROR\t- Failed search POST")
-		traceback.print_exc()
+		if debug:
+			traceback.print_exc()
 
 	if response.status_code == 200:
 		parsed = json.loads(response.text)
@@ -280,107 +302,158 @@ def search(searchInput, filterInput, numberInput, dateInput, uniqueInput, format
 			else:
 				# Error
 				print ("ERROR\t- '{}' - Unknown unique term. Please try again".format(keyword))
+				if debug:
+					traceback.print_exc()
 				exit()
 		if formatInput == 'json':
 			content = json.dumps(parsed, indent=4, sort_keys=False)
 			if downloadInput:
 				target_uuid = uuid.uuid4()
-				saveToFile(content, target_uuid, 'json')
+				saveToFile(content, target_uuid, 'json', debug)
 			else:
 				print(content)
 		elif formatInput == 'csv':
-			# parsed = json.loads(response.text)
-			# content = json.dumps(parsed)
 			df = json_to_dataframe(parsed)
 			content = df.to_csv()
 			if downloadInput:
 				target_uuid = uuid.uuid4()
-				saveToFile(content, target_uuid, 'csv')
+				saveToFile(content, target_uuid, 'csv', debug)
 			else:
 				print(content)
 		else:
 			content = json.dumps(parsed)
 			if downloadInput:
 				target_uuid = uuid.uuid4()
-				saveToFile(content, target_uuid, 'json')
+				saveToFile(content, target_uuid, 'json', debug)
 			else:
 				print (content)
 	elif response.status_code == 403:
 		print ("ERROR\t- Forbidden")
+		if debug:
+			traceback.print_exc()
 	else:
 		# Error
 		print("ERROR\t- Failed search")
-		print (response.text)
-
-# Function to prevent duplicate kit submission
-# Note: There is a duplication checker on the back end, this is to save wasting submission quotas
-# It is strongly recommended you keep this check before submitting kits as duplicates will not be processed
-def duplicateChecker(target_zip, zipsha256):
-	try:
-		headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
-		data = {}
-		data['kit.sha256'] = zipsha256
-		data = json.dumps(data)
-		try:
-			# Slow down multi-kit ingest to avoid duplicate kit overlaps
-			time.sleep(0.12)
-			# POST request to the endpoint
-			response = requests.post(URL_Endpoint + "/search", data=data, headers=headers)
-			if response.status_code == 403:
-				print ("Uploader only restrictions apply - ", end='')
-				return False
-			result = json.loads(response.text)
-			if result['total_count']:
-				# Found duplicates
-				return True
-			else:
-				# No duplicates found
-				return False
-		except Exception as e:
-			# Error
-			print ("ERROR\t- Failed hash search")
-			print (e)
-	except Exception as e:
-		# Error
-		print ("ERROR\t- Duplicate checker error")
-		print (e)
+		if debug:
+			traceback.print_exc()
+			print (response.text)
 
 # Function to validate zip file before submission
-def validateZip(target_zip, zipsha256):
+def validateZip(target_zip, zipsha256, debug):
 	if target_zip.lower().endswith('.zip'):
 		try:
 			with open(target_zip, 'rb') as f:
 				header_byte = f.read()[0:4].hex().lower()
 				# Check header bytes comply with PKZIP archive file
 				if header_byte == '504b0304':
-					if duplicateChecker(target_zip, zipsha256):
-						# File present in KIT already
-						print ("OK\t- Kit already present in KIT\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
-						f.close()
-						return False
+					f.close()
+					if debug:
+						print ("Passed zip validation")
+					return True 
 				else:
 					# Error
-					print ("ERROR\t- File does not appear to be a zip file")
+					print ("ERROR#1\t- File not a '.zip' file\t\t\t- Filename: {}".format(os.path.basename(target_zip)))
+					if debug:
+						print ("Failed zip validation")
+						traceback.print_exc()
 					f.close()
 					return False
-
-			# File passed basic local checks
-			return True
-
 		except IOError as e:
 			# Error
-			print ("ERROR\t- Unable to read file")
-			print (e)
+			print ("ERROR\t- Unable to read file\t\t\t- Filename: {}".format(os.path.basename(target_zip)))
+			if debug:
+				traceback.print_exc()
+				print (e)
 			return False
 	else:
 		# Error
-		print ("ERROR\t- File not a '.zip' file\t- Filename: " + str(os.path.basename(target_zip)))
+		print ("ERROR#2\t- File not a '.zip' file\t\t\t- Filename: {}".format(os.path.basename(target_zip)))
+		if debug:
+			traceback.print_exc()
+		return False
 
-# Function to submit a kit to KIT Intel for processing
-def submit(ziplocation, recursive):
+# Function to prevent duplicate kit submission
+# Note: There is a duplication checker on the back end, this is to save wasting submission quotas
+# It is strongly recommended you keep this check before submitting kits as duplicates will not be processed
+def duplicateChecker(target_zip, zipsha256, debug):
+	headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
+	data = {
+		"filter": ["kit.UUID"],
+		"page_size": 1
+	}
+	data['kit.sha256'] = zipsha256
 	try:
-		# Allow for multiple kit uploads
+		# Slow down multi-kit ingest to avoid duplicate kit overlaps
+		time.sleep(1)
+		# POST request to the endpoint
+		if debug:
+			print ("Making search POST - " + str(time.time()))
+			print (data)
+		response = requests.post(URL_Endpoint + "/search", data=json.dumps(data), headers=headers)
+		if debug:
+			print ("Finished  search POST - " + str(time.time()))
+		if response.status_code == 403:
+			print ("Uploader only restrictions apply - ", end='')
+			return True
+		if response.status_code == 200 and response.json()["total_count"] is None:
+			# No duplicates found
+			return True
+		else:
+			# Found duplicates
+			print ("OK\t- Kit already present in KITIntel\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
+			return False
+	except Exception as e:
+		# Error
+		print ("ERROR\t- Failed duplicate checking POST request")
+		if debug:
+			print (e)
+			traceback.print_exc()
+		# If search fails upload the kit anyway
+		return True
+
+def submitPost(zipfile, debug):
+	file_size = os.stat(zipfile).st_size
+
+	headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
+	data = {
+		"file_name": os.path.basename(zipfile)
+	}
+
+	res = requests.post(URL_Endpoint + "/submit", headers=headers, data=json.dumps(data))
+	if debug:
+		print (res.json())
+	if res.status_code == 200:
+		presigned_headers = {'Content-Type': 'application/binary'}
+		presigned_url = res.json()['upload_url']
+		with open(zipfile, 'rb') as f:
+			try:
+				with tqdm(total=file_size, unit="B", unit_scale=True, unit_divisor=1024) as t:
+					wrapped_file = CallbackIOWrapper(t.update, f, "read")
+					upload = requests.put(
+						presigned_url, headers=presigned_headers, data=wrapped_file)
+					if upload.status_code == 200:
+						return True
+					if upload.status_code != 200:
+						print("ERROR\t- Upload Failed at state 1")
+						if debug:
+							print (upload.status_code)
+							print (upload.text)
+			except Exception as e:
+				print("ERROR\t- Upload Failed at state 2")
+				if debug:
+					print(e)
+					traceback.print_exc()
+	return False
+
+
+def submit(ziplocation, recursive, debug):
+	if debug:
+		print ("-------------------------------------------------------------------------------------")
+	try:
+		#Allow for multiple kit uploads
 		for target_zip in ziplocation:
+			if debug:
+				print ("Running: {}".format(target_zip))
 			# Check if current item is a directory
 			if os.path.isdir(target_zip):
 				ziplocation = []
@@ -391,65 +464,71 @@ def submit(ziplocation, recursive):
 				else:
 					# Create a list of all files in current directory which end in .zip
 					ziplocation = glob.glob(target_zip + '/*.zip', recursive=False)
-				submit(ziplocation, False)
+				if debug:
+					print (ziplocation)
+				submit(ziplocation, False, debug)
 			else:
-				# Item is not a zip so can be processed as a file
+				if debug:
+					print ("File Entered")
+				# Item is not a dir so can be processed as a file
 				with open(target_zip, 'rb') as f:
 					# Generate SHA256 for file
 					h  = hashlib.sha256()
 					b  = bytearray(128*1024)
 					mv = memoryview(b)
 					# Initialize variable
-					zipsha256 = ""
+					# This is a 0 byte file hash - Sha256 fails with a 0 byte file.
+					zipsha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 					for n in iter(lambda : f.readinto(mv), 0):
 						h.update(mv[:n])
 						zipsha256 = h.hexdigest()
 					# Check to ensure hash has generated
 					if len(zipsha256) < 64:
 						# Error
-						print("ERROR\t- Not a valid zip\t\t- kit.kitname: {}".format(str(os.path.basename(target_zip))))
+						print("ERROR\t- Unable to generate hash\t\t\t- kit.kitname: {}".format(str(os.path.basename(target_zip))))
+						traceback.print_exc()
 					else:
-						if validateZip(target_zip, zipsha256):
-							# Submit New Kit
-							headers = {'x-api-key': Env_KIT_APIKey, 'Content-Type': 'application/json'}
-							data = {}
-							data['file_name'] = os.path.basename(target_zip)
-							try:
-								# POST request to the endpoint
-								response = requests.post(URL_Endpoint + "/submit", headers=headers, data=json.dumps(data))
-							except Exception as e:
-								# Error
-								print("ERROR\t- Failed request to submit")
-								print (response.text)
-								exit()
-							# OK
-							if response.status_code == 200:
-								result = response.json()
-								target_url = (result['upload_url'])
-								headers = {'Content-Type': 'application/binary'}
-								# Save file binary data ready for upload
-								f = open(target_zip, 'rb')
-								data = f.read()
-								f.close()
-								try:
-									# PUT request to the endpoint
-									upload = requests.put(target_url, data=data, headers=headers)
-									if upload.status_code == 200:
-										# OK
-										print ("SUCCESS\t- File submitted\t\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
-									else:
-										# Error
-										print ("ERROR\t- Upload failed\t\t- Status code: " + str(upload.status_code))
-								except Exception as e:
-									# Error
-									print ("ERROR\t- Failed PUT request")
-									print (e)
-							elif response.status_code == 403:
-								print ("ERROR\t- Forbidden")
-							else:
-								print ("ERROR\t- Failed POST\t- Status code: " + str(response.status_code))
-
-
+						try:
+							while True:
+								if debug:
+									print ("Validation Check - start")
+								upload = validateZip(target_zip, zipsha256, debug)
+								if debug:
+									print ("Validation Check - end")
+								if not upload:
+									if debug:
+										print ("File is not a valid zip - no upload required")
+									break
+								if debug:
+									print ("Duplicate Check - start")
+								upload = duplicateChecker(target_zip, zipsha256, debug)
+								if debug:
+									print ("Duplicate Check - end")
+								if not upload:
+									if debug:
+										print ("File is Duplicate - no upload required")
+									break
+								# if not duplicate:
+								if debug:
+									print("New kit - starting upload {} to S3...".format(str(os.path.basename(target_zip))))
+								counter = 0
+								while True:
+									if debug:
+										print ("Submission start")
+									success = submitPost(target_zip, debug)
+									if debug:
+										print ("Submission end")
+									if success:
+										print ("SUCCESS\t- File submitted\t\t\t\t- sha256: {}\t- kit.kitname: {}".format(str(zipsha256), str(os.path.basename(target_zip[:-4]))))
+										break
+									if counter > 10:
+										print("ERROR\t- Attempted upload 10 times and failed\t\t- kit.kitname: {}".format(str(os.path.basename(target_zip[:-4]))))
+										break
+									counter = counter + 1
+						except Exception as e:
+							if debug:
+								print (e)
+								traceback.print_exc()
 	except OSError as e:
 		# Handle if a directory is inputted
 		if e.errno == 21:
@@ -457,8 +536,9 @@ def submit(ziplocation, recursive):
 	except Exception as e:
 		# Error
 		print ("ERROR\t- Error in kit submission")
-		print (e)
-
+		if debug:
+			traceback.print_exc()
+			print (e)
 
 
 # Main Function
@@ -470,7 +550,6 @@ def main():
 	subparsers = parser.add_subparsers(help='Commands Available', dest='command')
 
 	# Search Parser
-	# -s search, -f filter, -n number, -d date, --format, --download
 	parser_search = subparsers.add_parser('search', help='Search KIT Intel - Search on kit names, hashes, code content, directory names')
 	parser_search.add_argument('-s', '--search', help='Search term', required='True')
 	parser_search.add_argument('-f', '--filter', help='Filter return keys. Split multiple keys with a comma')
@@ -479,18 +558,19 @@ def main():
 	parser_search.add_argument('-u', '--unique', help='Print only unique values when given a key')
 	parser_search.add_argument('--format', choices=['json', 'csv'], help='Change output format - Default unformatted json', default='None')
 	parser_search.add_argument('--download', help='Download output to file', action="store_true")
+	parser_search.add_argument('--debug', help='Verbose output for debugging only', action="store_true")
 
 	# Content Parser
-	# -u uuid, -d download
 	parser_content = subparsers.add_parser('content', help='Download file content - Default behavior is to print to screen, file can also be downloaded into the current working directory')
 	parser_content.add_argument('-u', '--uuid', help='UUID(s) to retrieve scans for', nargs='+', required='True')
 	parser_content.add_argument('-d', '--download', help='Download content to file', action="store_true")
+	parser_content.add_argument('--debug', help='Verbose output for debugging only', action="store_true")
 
 	# Submit Parser
-	# -f file, -r recursive
 	parser_submit = subparsers.add_parser('submit', help='Submit a phishing kit for analysis - Submit a single file, multiple files, or a directory')
 	parser_submit.add_argument('-f', '--file', help='Zip file(s) to submit or directory', nargs='+', required='True')
 	parser_submit.add_argument('-r', '--recursive', help='Enable directory recursion', action="store_true")
+	parser_submit.add_argument('--debug', help='Verbose output for debugging only', action="store_true")
 
 	parser.add_argument('-v', '--version', action='version', version='%(prog)s-{version}'.format(version=__version__))
 
@@ -498,13 +578,13 @@ def main():
 
 	# Search
 	if args.command == 'search':
-		search(args.search, args.filter, args.number, args.date, args.unique, args.format, args.download)
+		search(args.search, args.filter, args.number, args.date, args.unique, args.format, args.download, args.debug)
 	# Content
 	elif args.command == 'content':
-		content(args.uuid, args.download)
+		content(args.uuid, args.download, args.debug)
 	# Submit
 	elif args.command == 'submit':
-		submit(args.file, args.recursive)
+		submit(args.file, args.recursive, args.debug)
 	else:
 		# Error
 		parser.print_help()
@@ -518,7 +598,7 @@ def versionCheck():
 
 	except Exception as e:
 		# Error
-		pass
+		print (e)
 
 if __name__ == '__main__':
 	main()
