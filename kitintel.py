@@ -16,12 +16,9 @@ Author :: Jake
 
 
 Change log:
-	- Overhaul of upload system
-	- Added debug option
-	- Logic changes to submit process
-
+	- Fixed bug in submission loops
 ''' 
-__version__ = '2.7.12'
+__version__ = '2.7.13'
 
 
 # Import Table
@@ -490,6 +487,7 @@ def submit(ziplocation, recursive, debug):
 					else:
 						try:
 							while True:
+								submit = True
 								if debug:
 									print ("Validation Check - start")
 								upload = validateZip(target_zip, zipsha256, debug)
@@ -498,6 +496,7 @@ def submit(ziplocation, recursive, debug):
 								if not upload:
 									if debug:
 										print ("File is not a valid zip - no upload required")
+									submit = False
 									break
 								if debug:
 									print ("Duplicate Check - start")
@@ -507,12 +506,13 @@ def submit(ziplocation, recursive, debug):
 								if not upload:
 									if debug:
 										print ("File is Duplicate - no upload required")
+									submit = False
 									break
 								# if not duplicate:
 								if debug:
 									print("New kit - starting upload {} to S3...".format(str(os.path.basename(target_zip))))
 								counter = 0
-								while True:
+								if submit:
 									if debug:
 										print ("Submission start")
 									success = submitPost(target_zip, debug)
