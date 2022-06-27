@@ -1,4 +1,6 @@
-requests
+flask
+flask_bcrypt
 feedparser
 pandas
+requests
 tqdm
