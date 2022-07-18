@@ -3,7 +3,7 @@
 
 The phishing Kit Intelligence Tracker (KIT) APIs are a set of static analysis tools for investigating and comparing phishing kit content within single or multiple kits. It can search file hashes, search file content, retrieve content, and submit kits to KIT for cross-analysis.
 
-A phishing kit is a package of software tools, often in the form of a compressed file, that makes it easier to launch phishing attacks and exploits. Phishing kits allow attackers to deploy and redeploy phishing infrastructure before and during an attack rapidly. There are various types of phishing kits, from those targeting consumers, employees, financial institutions, marketplaces, and many more. Kits can deploy malware, collect credentials, detect bots, block IP ranges, generate QR codes, and update dynamically. Use KIT to ingestigate and compare phishing kits, discover evidence about attackers and kit publishers, identify evasion techniques, and find new exploits.
+A phishing kit is a package of software tools, often in the form of a compressed file, that makes it easier to launch phishing attacks and exploits. Phishing kits allow attackers to deploy and redeploy phishing infrastructure before and during an attack rapidly. There are various types of phishing kits, from those targeting consumers, employees, financial institutions, marketplaces, and many more. Kits can deploy malware, collect credentials, detect bots, block IP ranges, generate QR codes, and update dynamically. Use KIT to investigate and compare phishing kits, discover evidence about attackers and kit publishers, identify evasion techniques, and find new exploits.
 
 # Contents
 :one:   - [Features](#features) <br/>
